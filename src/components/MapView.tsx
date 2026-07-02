@@ -1,8 +1,29 @@
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import L from 'leaflet'
 import type { Article } from '../lib/types'
 import { ACTION_LABELS, ACTION_COLORS, formatDate, primaryAction } from '../lib/format'
+
+// Leaflet computes its tile grid from the container's size at the moment it
+// mounts. On mobile the map panel starts hidden (display:none) behind the
+// "List" tab, so it mounts with a 0x0 (or stale) size and only ever renders
+// tiles for that wrong size — leaving most of the panel blank once it's
+// shown. Watching the container with a ResizeObserver and calling
+// invalidateSize() whenever its real size changes fixes this for tab
+// switches, window resizes, and orientation changes alike.
+function ResizeHandler() {
+  const map = useMap()
+  useEffect(() => {
+    const container = map.getContainer()
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize()
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [map])
+  return null
+}
 
 function dotIcon(color: string) {
   return L.divIcon({
@@ -32,6 +53,7 @@ export default function MapView({ articles }: { articles: Article[] }) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
+      <ResizeHandler />
       <MarkerClusterGroup chunkedLoading maxClusterRadius={45}>
         {articles.map((a) => {
           const main = primaryAction(a.action_taken)

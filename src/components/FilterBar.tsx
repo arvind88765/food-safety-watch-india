@@ -20,7 +20,7 @@ export default function FilterBar({
   showNoise, setShowNoise, view, setView, resultCount, actionOptions,
 }: Props) {
   return (
-    <div className="border-b border-paper/10 bg-ink/95 backdrop-blur px-4 sm:px-5 py-3 flex flex-col gap-3">
+    <div className="border-b border-paper/10 bg-ink/95 backdrop-blur px-4 sm:px-5 py-2.5 sm:py-3 flex flex-col gap-2 sm:gap-3">
       <div className="flex items-center gap-3">
         <div className="font-display text-lg sm:text-xl tracking-tight text-paper whitespace-nowrap">
           Ledger<span className="text-marigold">.</span>
@@ -48,11 +48,11 @@ export default function FilterBar({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs">
+      <div className="flex items-center gap-2 text-xs overflow-x-auto scrollbar-thin whitespace-nowrap -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
         <select
           value={state}
           onChange={(e) => setState(e.target.value)}
-          className="bg-paper/5 border border-paper/15 rounded px-2 py-1.5 text-paper focus:outline-none focus:border-marigold"
+          className="shrink-0 bg-paper/5 border border-paper/15 rounded px-2 py-1.5 text-paper focus:outline-none focus:border-marigold"
         >
           <option value="">All states</option>
           <option value="Telangana">Telangana</option>
@@ -62,7 +62,7 @@ export default function FilterBar({
         <select
           value={action}
           onChange={(e) => setAction(e.target.value)}
-          className="bg-paper/5 border border-paper/15 rounded px-2 py-1.5 text-paper focus:outline-none focus:border-marigold"
+          className="shrink-0 bg-paper/5 border border-paper/15 rounded px-2 py-1.5 text-paper focus:outline-none focus:border-marigold"
         >
           <option value="">All actions</option>
           {actionOptions.map((a) => (
@@ -70,17 +70,18 @@ export default function FilterBar({
           ))}
         </select>
 
-        <label className="flex items-center gap-1.5 text-paper/60 cursor-pointer select-none ml-1">
+        <label className="shrink-0 flex items-center gap-1.5 text-paper/60 cursor-pointer select-none ml-1">
           <input
             type="checkbox"
             checked={showNoise}
             onChange={(e) => setShowNoise(e.target.checked)}
             className="accent-marigold"
           />
-          Include low-confidence matches
+          <span className="hidden sm:inline">Include low-confidence matches</span>
+          <span className="sm:hidden">Low-confidence</span>
         </label>
 
-        <span className="ml-auto font-mono text-paper/40">{resultCount.toLocaleString()} records</span>
+        <span className="shrink-0 sm:ml-auto font-mono text-paper/40">{resultCount.toLocaleString()} records</span>
       </div>
     </div>
   )
