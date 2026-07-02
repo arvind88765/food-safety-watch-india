@@ -9,8 +9,8 @@ interface Props {
   setAction: (v: string) => void
   showNoise: boolean
   setShowNoise: (v: boolean) => void
-  view: 'map' | 'list'
-  setView: (v: 'map' | 'list') => void
+  view: 'map' | 'list' | 'stats'
+  setView: (v: 'map' | 'list' | 'stats') => void
   resultCount: number
   actionOptions: string[]
 }
@@ -44,6 +44,12 @@ export default function FilterBar({
             className={`px-3 py-2 transition-colors ${view === 'list' ? 'bg-marigold text-ink' : 'text-paper/60 hover:text-paper'}`}
           >
             List
+          </button>
+          <button
+            onClick={() => setView('stats')}
+            className={`px-3 py-2 transition-colors ${view === 'stats' ? 'bg-marigold text-ink' : 'text-paper/60 hover:text-paper'}`}
+          >
+            Stats
           </button>
         </div>
       </div>
