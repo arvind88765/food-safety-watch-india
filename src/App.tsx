@@ -88,6 +88,10 @@ export default function App() {
         view={view} setView={setView}
         resultCount={filtered.length}
         actionOptions={allActions}
+        onGoHome={() => {
+          sessionStorage.removeItem('ledger-entered')
+          setEntered(false)
+        }}
       />
 
       <div className="sm:hidden">

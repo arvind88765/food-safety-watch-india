@@ -13,21 +13,26 @@ interface Props {
   setView: (v: 'map' | 'list' | 'stats') => void
   resultCount: number
   actionOptions: string[]
+  onGoHome: () => void
 }
 
 export default function FilterBar({
   query, setQuery, state, setState, action, setAction,
-  showNoise, setShowNoise, view, setView, resultCount, actionOptions,
+  showNoise, setShowNoise, view, setView, resultCount, actionOptions, onGoHome,
 }: Props) {
   return (
     <div className="border-b border-paper/10 bg-ink/95 backdrop-blur px-4 sm:px-5 py-2.5 sm:py-3 flex flex-col gap-2 sm:gap-3">
       <div className="flex items-center gap-3">
-        <div className="flex flex-col leading-none whitespace-nowrap">
+        <button
+          onClick={onGoHome}
+          title="Back to home"
+          className="flex flex-col leading-none whitespace-nowrap text-left hover:opacity-80 transition-opacity"
+        >
           <div className="font-display text-lg sm:text-xl tracking-tight text-paper">
             Ledger<span className="text-marigold">.</span>
           </div>
           <div className="hidden sm:block font-mono text-[0.55rem] text-paper/30 mt-0.5">by Rvind</div>
-        </div>
+        </button>
         <input
           type="text"
           value={query}
