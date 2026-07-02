@@ -26,7 +26,7 @@ export default function FilterBar({
           <div className="font-display text-lg sm:text-xl tracking-tight text-paper">
             Ledger<span className="text-marigold">.</span>
           </div>
-          <div className="hidden sm:block font-mono text-[0.55rem] text-paper/30 mt-0.5">by Arvind</div>
+          <div className="hidden sm:block font-mono text-[0.55rem] text-paper/30 mt-0.5">by Rvind</div>
         </div>
         <input
           type="text"
