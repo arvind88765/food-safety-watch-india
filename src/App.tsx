@@ -95,7 +95,7 @@ export default function App() {
       />
 
       <div className="sm:hidden">
-        <div className="px-4 pt-2 pb-1 font-mono text-[0.6rem] uppercase tracking-wide text-paper/35 bg-ink">
+        <div className="px-4 pt-2.5 pb-1.5 font-mono text-sm uppercase tracking-wide text-paper/50 bg-ink text-center">
           Views
         </div>
         <div className="flex border-b border-paper/10 text-xs font-mono uppercase">
