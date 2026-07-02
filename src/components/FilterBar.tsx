@@ -22,8 +22,11 @@ export default function FilterBar({
   return (
     <div className="border-b border-paper/10 bg-ink/95 backdrop-blur px-4 sm:px-5 py-2.5 sm:py-3 flex flex-col gap-2 sm:gap-3">
       <div className="flex items-center gap-3">
-        <div className="font-display text-lg sm:text-xl tracking-tight text-paper whitespace-nowrap">
-          Ledger<span className="text-marigold">.</span>
+        <div className="flex flex-col leading-none whitespace-nowrap">
+          <div className="font-display text-lg sm:text-xl tracking-tight text-paper">
+            Ledger<span className="text-marigold">.</span>
+          </div>
+          <div className="hidden sm:block font-mono text-[0.55rem] text-paper/30 mt-0.5">by Arvind</div>
         </div>
         <input
           type="text"

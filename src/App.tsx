@@ -5,8 +5,12 @@ import FilterBar from './components/FilterBar'
 import MapView from './components/MapView'
 import RecordCard from './components/RecordCard'
 import StatsView from './components/StatsView'
+import LandingPage from './components/LandingPage'
 
 export default function App() {
+  const [entered, setEntered] = useState(
+    typeof window !== 'undefined' && sessionStorage.getItem('ledger-entered') === '1'
+  )
   const [data, setData] = useState<Article[] | null>(null)
   const [error, setError] = useState(false)
   const [query, setQuery] = useState('')
@@ -46,6 +50,17 @@ export default function App() {
 
     return [...base].sort((a, b) => (b.published || '').localeCompare(a.published || ''))
   }, [data, query, state, action, showNoise, fuse])
+
+  if (!entered) {
+    return (
+      <LandingPage
+        onEnter={() => {
+          sessionStorage.setItem('ledger-entered', '1')
+          setEntered(true)
+        }}
+      />
+    )
+  }
 
   if (error) {
     return (
