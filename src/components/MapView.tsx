@@ -85,7 +85,7 @@ function LocateControl({
     <button
       onClick={handleClick}
       title="Show my location"
-      className="absolute z-[1000] right-3 bottom-8 sm:bottom-3 bg-ink border border-paper/20 rounded-md w-9 h-9 flex items-center justify-center text-paper hover:bg-paper/10 transition-colors shadow-lg"
+      className="absolute z-[1000] right-3 bottom-16 sm:bottom-3 bg-ink border border-paper/20 rounded-md w-9 h-9 flex items-center justify-center text-paper hover:bg-paper/10 transition-colors shadow-lg"
     >
       {status === 'locating' ? (
         <span className="w-3.5 h-3.5 rounded-full border-2 border-paper/30 border-t-marigold animate-spin" />
