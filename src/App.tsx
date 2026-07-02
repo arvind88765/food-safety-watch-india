@@ -90,25 +90,30 @@ export default function App() {
         actionOptions={allActions}
       />
 
-      <div className="sm:hidden flex border-b border-paper/10 text-xs font-mono uppercase">
-        <button
-          onClick={() => setView('map')}
-          className={`flex-1 py-2 ${view === 'map' ? 'bg-marigold text-ink' : 'text-paper/60'}`}
-        >
-          Map
-        </button>
-        <button
-          onClick={() => setView('list')}
-          className={`flex-1 py-2 ${view === 'list' ? 'bg-marigold text-ink' : 'text-paper/60'}`}
-        >
-          List ({filtered.length})
-        </button>
-        <button
-          onClick={() => setView('stats')}
-          className={`flex-1 py-2 ${view === 'stats' ? 'bg-marigold text-ink' : 'text-paper/60'}`}
-        >
-          Stats
-        </button>
+      <div className="sm:hidden">
+        <div className="px-4 pt-2 pb-1 font-mono text-[0.6rem] uppercase tracking-wide text-paper/35 bg-ink">
+          Views
+        </div>
+        <div className="flex border-b border-paper/10 text-xs font-mono uppercase">
+          <button
+            onClick={() => setView('map')}
+            className={`flex-1 py-2 ${view === 'map' ? 'bg-marigold text-ink' : 'text-paper/60'}`}
+          >
+            Map
+          </button>
+          <button
+            onClick={() => setView('list')}
+            className={`flex-1 py-2 ${view === 'list' ? 'bg-marigold text-ink' : 'text-paper/60'}`}
+          >
+            List ({filtered.length})
+          </button>
+          <button
+            onClick={() => setView('stats')}
+            className={`flex-1 py-2 ${view === 'stats' ? 'bg-marigold text-ink' : 'text-paper/60'}`}
+          >
+            Stats
+          </button>
+        </div>
       </div>
 
       {view === 'stats' ? (

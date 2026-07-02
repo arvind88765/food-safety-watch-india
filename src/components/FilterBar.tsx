@@ -35,25 +35,28 @@ export default function FilterBar({
           placeholder="Search district, restaurant, source…"
           className="flex-1 min-w-0 bg-paper/5 border border-paper/15 rounded-md px-3 py-2 text-sm text-paper placeholder:text-paper/40 focus:outline-none focus:border-marigold focus:ring-1 focus:ring-marigold"
         />
-        <div className="hidden sm:flex items-center rounded-md border border-paper/15 overflow-hidden text-xs font-mono uppercase">
-          <button
-            onClick={() => setView('map')}
-            className={`px-3 py-2 transition-colors ${view === 'map' ? 'bg-marigold text-ink' : 'text-paper/60 hover:text-paper'}`}
-          >
-            Map
-          </button>
-          <button
-            onClick={() => setView('list')}
-            className={`px-3 py-2 transition-colors ${view === 'list' ? 'bg-marigold text-ink' : 'text-paper/60 hover:text-paper'}`}
-          >
-            List
-          </button>
-          <button
-            onClick={() => setView('stats')}
-            className={`px-3 py-2 transition-colors ${view === 'stats' ? 'bg-marigold text-ink' : 'text-paper/60 hover:text-paper'}`}
-          >
-            Stats
-          </button>
+        <div className="hidden sm:flex flex-col items-center gap-1">
+          <span className="font-mono text-[0.55rem] uppercase tracking-wide text-paper/35 self-start">Views</span>
+          <div className="flex items-center rounded-md border border-paper/15 overflow-hidden text-xs font-mono uppercase">
+            <button
+              onClick={() => setView('map')}
+              className={`px-3 py-2 transition-colors ${view === 'map' ? 'bg-marigold text-ink' : 'text-paper/60 hover:text-paper'}`}
+            >
+              Map
+            </button>
+            <button
+              onClick={() => setView('list')}
+              className={`px-3 py-2 transition-colors ${view === 'list' ? 'bg-marigold text-ink' : 'text-paper/60 hover:text-paper'}`}
+            >
+              List
+            </button>
+            <button
+              onClick={() => setView('stats')}
+              className={`px-3 py-2 transition-colors ${view === 'stats' ? 'bg-marigold text-ink' : 'text-paper/60 hover:text-paper'}`}
+            >
+              Stats
+            </button>
+          </div>
         </div>
       </div>
 
