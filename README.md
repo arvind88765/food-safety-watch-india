@@ -1,4 +1,4 @@
-# Food Safety Watch — Telangana & Andhra Pradesh
+# Food Safety Watch - Telangana & Andhra Pradesh
 
 A searchable map and list tracking food safety enforcement across Telangana and Andhra Pradesh. Built from 2,162 news headlines scraped from Google News RSS, covering raids, seizures, fines, and poisoning incidents district by district.
 
