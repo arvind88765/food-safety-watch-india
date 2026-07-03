@@ -6,6 +6,7 @@ import MapView from './components/MapView'
 import RecordCard from './components/RecordCard'
 import StatsView from './components/StatsView'
 import LandingPage from './components/LandingPage'
+import DetailPanel from './components/DetailPanel'
 
 export default function App() {
   const [entered, setEntered] = useState(
@@ -20,6 +21,10 @@ export default function App() {
   const [view, setView] = useState<'map' | 'list' | 'stats'>(
     typeof window !== 'undefined' && window.innerWidth < 768 ? 'list' : 'map'
   )
+  // Currently-open record. null = list is showing. When set, DetailPanel
+  // replaces the list column on both mobile and desktop. Keeps everything
+  // one-click away without a full route change.
+  const [selected, setSelected] = useState<Article | null>(null)
 
   useEffect(() => {
     fetch('/data.json')
@@ -51,6 +56,14 @@ export default function App() {
     return [...base].sort((a, b) => (b.published || '').localeCompare(a.published || ''))
   }, [data, query, state, action, showNoise, fuse])
 
+  // If filters change and the selected record is no longer visible, drop
+  // it — otherwise the detail panel outlives its listing context.
+  useEffect(() => {
+    if (selected && !filtered.some((a) => a.id === selected.id)) {
+      setSelected(null)
+    }
+  }, [filtered, selected])
+
   if (!entered) {
     return (
       <LandingPage
@@ -76,6 +89,15 @@ export default function App() {
         Loading records…
       </div>
     )
+  }
+
+  // Clicking a record on the map switches to list view on mobile so the
+  // detail panel is actually visible (map full-screens the map on phones).
+  const handleSelect = (a: Article) => {
+    setSelected(a)
+    if (typeof window !== 'undefined' && window.innerWidth < 640 && view === 'map') {
+      setView('list')
+    }
   }
 
   return (
@@ -127,17 +149,31 @@ export default function App() {
       ) : (
         <div className="flex-1 min-h-0 flex">
           <div className={`${view === 'map' ? 'block' : 'hidden'} sm:block flex-1 min-w-0`}>
-            <MapView articles={filtered} />
+            <MapView
+              articles={filtered}
+              selectedId={selected?.id ?? null}
+              onSelect={handleSelect}
+            />
           </div>
           <div
-            className={`${view === 'list' ? 'flex' : 'hidden'} sm:flex flex-col w-full sm:w-[420px] lg:w-[480px] border-l border-paper/10 overflow-y-auto scrollbar-thin`}
+            className={`${view === 'list' ? 'flex' : 'hidden'} sm:flex flex-col w-full sm:w-[420px] lg:w-[480px] border-l border-paper/10 overflow-hidden`}
           >
-            {filtered.length === 0 ? (
+            {selected ? (
+              <DetailPanel article={selected} onClose={() => setSelected(null)} />
+            ) : filtered.length === 0 ? (
               <div className="px-5 py-10 text-center text-paper/40 text-sm">
                 No records match. Try widening your filters.
               </div>
             ) : (
-              filtered.map((a) => <RecordCard key={a.id} article={a} />)
+              <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+                {filtered.map((a) => (
+                  <RecordCard
+                    key={a.id}
+                    article={a}
+                    onSelect={handleSelect}
+                  />
+                ))}
+              </div>
             )}
           </div>
         </div>
