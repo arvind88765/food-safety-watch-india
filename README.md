@@ -1,73 +1,31 @@
-# Ledger — Food Safety Watch (Telangana & Andhra Pradesh)
+# Food Safety Watch — Telangana & Andhra Pradesh
 
-A searchable map + list of food-safety enforcement news scraped from Google News RSS
-across Telangana and Andhra Pradesh districts.
+A searchable map and list tracking food safety enforcement across Telangana and Andhra Pradesh. Built from 2,162 news headlines scraped from Google News RSS, covering raids, seizures, fines, and poisoning incidents district by district.
 
-## What's in the data
+🔗 **Live site:** [food-safety-watch-india.vercel.app](https://food-safety-watch-india.vercel.app)
 
-`public/data.json` holds 2,162 cleaned records. Each one was built from a news
-headline only (no full article body — that would require scraping each publisher,
-which isn't done here), so treat these fields as best-effort:
+---
 
-- `district` / `state` / `lat` / `lon` — extracted from the search query that found
-  the article, then geocoded to the district's approximate centroid (jittered
-  slightly so pins don't stack). This is district-level accuracy, not
-  street-level — it does NOT know the actual restaurant's address.
-- `action_taken` — keyword-classified from the headline (raided, sealed, fined,
-  food seized, license cancelled, notice issued, samples collected, poisoning
-  incident). A headline can have zero or multiple.
-- `violations` — keyword-classified themes mentioned in the headline (expired
-  ingredients, unhygienic conditions, pest infestation, no license, etc).
-- `confidence` — `high` / `medium` / `low` / `noise`. Many of the original 2,547
-  scraped items were off-topic (general news that matched a keyword query by
-  coincidence — water plans, election news, unrelated raids in other states).
-  Those are tagged `noise` and hidden by default; there's a toggle to show them.
-- `fine_amount`, `authority` — regex-extracted where a rupee figure or a known
-  authority name (H-FAST, FSSAI, GHMC) appeared in the headline.
+## What it shows
 
-To get real per-restaurant detail (name, specific violations found, exact
-address) you'd need to fetch and parse each article's full body — a much bigger
-job (2,000+ page fetches) that wasn't part of this pass. The "Read source" link
-on every record takes you to the original article for that.
+Every record comes from a news headline, so the data is best-effort — not official government records. Here's what each field means:
 
-## Local development
+- **district / state / lat / lon** — where the incident was reported, geocoded to the district's rough center. Pins are jittered slightly so they don't overlap. Street-level accuracy isn't possible from headlines alone.
+- **action_taken** — what enforcement happened: raided, sealed, fined, food seized, license cancelled, notice issued, samples collected, or a poisoning incident. One headline can have multiple.
+- **violations** — themes found in the headline: expired ingredients, unhygienic conditions, pest infestation, operating without a license, etc.
+- **confidence** — how relevant the article actually is. Out of 2,547 scraped items, a chunk were off-topic — water infrastructure news, election coverage, raids in other states. Those are tagged `noise` and hidden by default, but you can toggle them on.
+- **fine_amount / authority** — pulled out where a rupee figure or a known body (FSSAI, H-FAST, GHMC) appeared in the headline.
 
-```bash
-npm install
-npm run dev
-```
+Every record links to the original article if you want the full story.
 
-## Build
+---
 
-```bash
-npm run build
-npm run preview   # to test the production build locally
-```
+## What it doesn't show
 
-## Deploy to Vercel
+Per-restaurant detail — actual name, exact address, specific violations found on inspection — would require fetching and parsing 2,000+ individual articles. That's a separate project. This is the headline layer.
 
-**Option A — Vercel CLI (fastest):**
-```bash
-npm install -g vercel
-vercel login
-vercel        # first deploy, follow prompts (framework: Vite, auto-detected)
-vercel --prod # promote to production
-```
+---
 
-**Option B — GitHub + Vercel dashboard:**
-1. Push this folder to a new GitHub repo.
-2. Go to vercel.com → New Project → import that repo.
-3. Vercel auto-detects Vite. Leave build command as `npm run build`, output
-   directory as `dist`. Deploy.
+## Stack
 
-No environment variables or API keys are needed — everything is static.
-
-## Updating the data later
-
-Re-run the cleaning pipeline against a fresh scrape, then replace
-`public/data.json` and redeploy:
-
-```bash
-python3 clean.py   # (from the data-processing scripts, see /foodwatch-data)
-cp articles_clean.json path/to/foodwatch/public/data.json
-```
+TypeScript · React · Vite · Python (data cleaning)
