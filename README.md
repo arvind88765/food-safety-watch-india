@@ -4,6 +4,30 @@ A searchable map and list of food safety enforcement across Telangana and Andhra
 
 🔗 **Live site:** [food-safety-watch-india.vercel.app](https://food-safety-watch-india.vercel.app)
 
+## Features
+
+**Map, list, and stats views.** Switch between a district level map with clustered pins, a scrollable list of every record newest first, or a stats dashboard that breaks the data down by state, district, action type, and month.
+
+**Severity coloring.** Every pin is graded from Procedural up to Critical, based on the enforcement action plus any red flag keywords in the headline (adulteration, pest, unhygienic, expired stock, and so on). The map reads as a risk heatmap at a glance instead of a wall of identical dots.
+
+**Hover previews.** Hovering a map pin shows a card with the headline, source, and date. No click needed to check if a pin is worth opening.
+
+**In app detail panel.** Click any pin or list card and you get the full record on the right side. Every attribute is shown up front: all actions, all violations, authority, fine amount, confidence, severity score. The link to the original article is one button inside the panel.
+
+**Fast search and filters.** Fuzzy search across headline, district, and source. Filter by state, by action type, and toggle whether to include low confidence matches.
+
+**Find nearby incidents.** There's a locate me button on the map. It plots your current position and lets you scan pins near you.
+
+**Mobile friendly.** Full support for mobile with a tab switcher between map, list, and stats. Pins and buttons are sized for touch.
+
+**Daily auto refresh.** A GitHub Action runs every night at 09:45 IST, pulls fresh news, merges it into the dataset, and redeploys the site. No manual work needed.
+
+**Deduped by article URL.** The same story cannot appear twice no matter how many times GDELT or Google News surfaces it. See [How the data stays fresh](#how-the-data-stays-fresh) for the full logic.
+
+**Landing page.** A short intro page explains what the site is before dropping you into the map, so first time visitors know what they're looking at.
+
+**Fully open source.** All the scraping, cleaning, and severity scoring lives in this repo. Nothing runs on a hidden server. If you want to fork it for your own state or country, the pipeline is portable.
+
 ## What each record means
 
 Everything on the map comes from a news headline, not from an official inspection report. Treat it as journalism, not government data.
