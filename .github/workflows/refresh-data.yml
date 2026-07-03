@@ -27,11 +27,13 @@ on:
         required: false
         default: ''
 
-# Only one refresh at a time. If a scheduled run collides with a manual
-# dispatch, cancel the older one so we don't double-commit.
+# Only one refresh at a time. If a new run gets triggered while another is
+# in flight, queue the new one behind the running one instead of killing
+# the running one. Cancelling mid-backfill would waste the ~25 minutes
+# already spent and leave gdelt_raw.json in a half-written state.
 concurrency:
   group: refresh-data
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   refresh:
