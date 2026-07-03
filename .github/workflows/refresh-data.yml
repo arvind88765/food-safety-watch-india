@@ -1,23 +1,31 @@
-# Weekly data refresh — pulls fresh food-safety news from GDELT (5-year
-# archive) and Google News RSS (last ~30 days), rebuilds public/data.json,
-# and commits it back to main. Vercel picks up the commit and redeploys
-# automatically, so the live site stays current with zero manual work.
+# Daily data refresh — pulls fresh food-safety news for the last ~2 days,
+# merges with the historical public/data.json (dedup'd on link), commits
+# the file back to main if anything changed. Vercel picks up the push and
+# redeploys automatically, so the live site is at most 24 hours stale.
 #
-# Schedule: 04:15 UTC every Monday (~09:45 IST). Off-peak both for GDELT
+# Schedule: 04:15 UTC every day (~09:45 IST). Off-peak both for GDELT
 # and for whoever's looking at the site.
 #
 # Manual trigger: workflow_dispatch — anyone with write access can hit
-# "Run workflow" in the Actions tab to force an early refresh.
+# "Run workflow" in the Actions tab. Optional inputs:
+#   · backfill_years — if set (e.g. "5"), does a one-time historical
+#     sweep instead of the daily 2-day window. Use once after merging
+#     this PR to seed 5 years of history, then never touch again.
 #
-# GDELT rate limit: the scraper honours ~5.5s between requests. Full sweep
-# is ~25 minutes; keep the job timeout well above that.
+# Rate limit: GDELT allows one request per 5s. Daily 2-day sweep is
+# ~2 minutes; the 5-year backfill is ~25 min. Job timeout covers both.
 
 name: Refresh data
 
 on:
   schedule:
-    - cron: '15 4 * * 1'
+    - cron: '15 4 * * *'
   workflow_dispatch:
+    inputs:
+      backfill_years:
+        description: 'Backfill years (leave blank for daily 2-day sweep). Use "5" once for initial seed.'
+        required: false
+        default: ''
 
 # Only one refresh at a time. If a scheduled run collides with a manual
 # dispatch, cancel the older one so we don't double-commit.
@@ -28,7 +36,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     permissions:
       # Needs to be able to push the rebuilt public/data.json back to main.
       contents: write
@@ -46,7 +54,12 @@ jobs:
       - name: Install Python deps
         run: pip install -r requirements.txt
 
-      - name: Scrape GDELT (5-year archive)
+      - name: Scrape GDELT
+        env:
+          # Manual dispatch with backfill_years=5 → 5-year sweep.
+          # Otherwise (scheduled run, or manual with empty input) → 2 days.
+          BACKFILL_YEARS: ${{ github.event.inputs.backfill_years }}
+          LOOKBACK_DAYS: '2'
         run: python scrape_gdelt.py
 
       - name: Scrape Google News RSS (recent top-up)
@@ -54,14 +67,13 @@ jobs:
         continue-on-error: true
         run: python scrape_rss.py
 
-      - name: Build public/data.json
+      - name: Merge with existing data.json and build public/data.json
         run: python clean.py
 
       - name: Commit if data changed
         # Only commit when the file actually differs. `git diff --quiet`
-        # exits non-zero on changes → we invert that with `!` and only then
-        # add/commit/push. Prevents noisy "no-op" commits when a week has
-        # no new food-safety news.
+        # exits non-zero on changes → invert with `!` and only then
+        # add/commit/push. Prevents noisy "no-op" commits on quiet days.
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
@@ -70,8 +82,8 @@ jobs:
             exit 0
           fi
           git add public/data.json
-          # Include record count in the message so the commit log is
-          # skimmable at a glance.
+          # Include record count and delta in the message so the commit
+          # log is skimmable at a glance.
           COUNT=$(python -c "import json;print(len(json.load(open('public/data.json'))))")
-          git commit -m "chore(data): weekly refresh — ${COUNT} records"
+          git commit -m "chore(data): daily refresh — ${COUNT} records"
           git push

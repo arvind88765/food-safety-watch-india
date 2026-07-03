@@ -3,19 +3,32 @@ clean.py — build public/data.json from all available raw sources.
 
 Sources it tries, in order:
 
-  1. gdelt_raw.json — 5-year historical archive from scrape_gdelt.py
-  2. rss_raw.json   — last ~30 days from scrape_rss.py (fresh top-up)
+  1. gdelt_raw.json — recent GDELT sweep from scrape_gdelt.py
+  2. rss_raw.json   — recent Google News RSS from scrape_rss.py
   3. news_food_safety_articles__1_.json — legacy seed (if present)
 
-Any source that isn't on disk is quietly skipped. Deduplication runs across
-the union, keyed on (title, link) so the same story from multiple sweeps
-collapses to one record.
+Any source that isn't on disk is quietly skipped.
 
-Classification (action_taken / violations / authority / fine / confidence) is
-regex-driven. This is deliberately keyword-level, not LLM-level — the whole
-point of the project is that we can rebuild the dataset any time from public
-RSS without paying for inference. An LLM upgrade for district attribution is
-on the roadmap (see PR discussion) but not required to run this pipeline.
+**Incremental merge.** The pipeline runs daily. Each run's raw JSON only
+covers the last couple of days (so it stays fast), but public/data.json
+must accumulate history — every story ever seen. So before writing out,
+we load whatever's already in public/data.json and merge it with the new
+raw records, then dedup on `link`. Old stories survive even if today's
+scrape didn't include them; new stories get appended; the same story never
+appears twice, no matter how many times its URL shows up across days or
+sources.
+
+Deduplication key = article `link`. Same URL across GDELT + RSS + legacy
+seed + previous public/data.json = one record. When the same link appears
+in multiple sources we keep the version that already has classification
+data attached (i.e. prefer the previously-cleaned public/data.json entry)
+so a badly-classified rerun doesn't overwrite a good older classification.
+
+Classification (action_taken / violations / authority / fine / confidence)
+is regex-driven. Deliberately keyword-level, not LLM-level — the whole
+point of the project is that we can rebuild the dataset any time from
+public RSS without paying for inference. LLM-based upgrades are tracked
+separately.
 
 Location attribution:
   · If the raw record carries `matched_query` (GDELT and legacy seed both
@@ -182,6 +195,8 @@ SOURCES = [
     "/mnt/user-data/uploads/news_food_safety_articles__1_.json",
 ]
 
+EXISTING_DATA = "public/data.json"
+
 
 def load_all_sources() -> list[dict]:
     merged: list[dict] = []
@@ -202,28 +217,85 @@ def load_all_sources() -> list[dict]:
     return merged
 
 
+def load_existing() -> list[dict]:
+    """Return the last-written public/data.json as raw-shaped records so
+    they can be merged with today's scrape. Missing file = fresh start."""
+    if not os.path.exists(EXISTING_DATA):
+        return []
+    try:
+        with open(EXISTING_DATA, encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"  ! could not read existing {EXISTING_DATA}: {e}", file=sys.stderr)
+        return []
+    if not isinstance(data, list):
+        return []
+    print(f"  · {EXISTING_DATA}: {len(data)} historical records", file=sys.stderr)
+    # Mark each so the merge step knows they've already been classified —
+    # avoids re-running regex over ten thousand records every day.
+    for r in data:
+        r["_from_existing"] = True
+    return data
+
+
 def main() -> int:
-    print("Loading sources…", file=sys.stderr)
-    raw = load_all_sources()
-    if not raw:
-        print("No input sources found. Run scrape_gdelt.py (or place a raw "
-              "JSON in the repo root) before running clean.py.", file=sys.stderr)
+    print("Loading existing dataset…", file=sys.stderr)
+    existing = load_existing()
+
+    print("Loading raw sources…", file=sys.stderr)
+    raw_new = load_all_sources()
+    if not raw_new and not existing:
+        print("No input sources and no existing data. Run scrape_gdelt.py "
+              "(or place a raw JSON in the repo root) before running clean.py.",
+              file=sys.stderr)
         return 1
 
-    # Dedup by (title, link). Same story via multiple queries → one record.
-    seen: set[tuple[str, str]] = set()
-    unique: list[dict] = []
-    for r in raw:
-        key = ((r.get("title", "") or "").strip().lower(), r.get("link", "") or "")
-        if key in seen:
+    # Dedup on `link` across the union. `link` is the strongest identity —
+    # the same story from different queries has the same URL, and news
+    # aggregators like Google News wrap the same source URL identically
+    # each time.
+    #
+    # Precedence when a link appears twice: prefer the record that already
+    # has classification (_from_existing=True) over a raw scrape. Keeps
+    # historical classifications intact across runs even if the raw's
+    # title-only classifier would have graded the same story differently.
+    by_link: dict[str, dict] = {}
+    for r in existing + raw_new:
+        link = (r.get("link") or "").strip()
+        if not link:
+            # Fall back to title as identity for the rare linkless record —
+            # can happen with legacy seed data.
+            link = "title::" + (r.get("title") or "").strip().lower()
+            if link == "title::":
+                continue  # nothing to key on
+        if link in by_link:
+            # Prefer existing (already-classified) over fresh raw.
+            if by_link[link].get("_from_existing"):
+                continue
+            if r.get("_from_existing"):
+                by_link[link] = r
+            # else: two raws with same link — keep whichever came first
             continue
-        seen.add(key)
-        unique.append(r)
-    print(f"Total raw: {len(raw)}   after dedup: {len(unique)}", file=sys.stderr)
+        by_link[link] = r
+
+    all_unique = list(by_link.values())
+    print(f"Existing: {len(existing)}   new raw: {len(raw_new)}   "
+          f"after link-dedup: {len(all_unique)}   "
+          f"(added {len(all_unique) - len(existing)} new)", file=sys.stderr)
 
     out: list[dict] = []
     skipped_no_district = 0
-    for i, d in enumerate(unique):
+    for d in all_unique:
+        # Records that came from public/data.json already have a district
+        # attributed and a classification computed — pass them through.
+        if d.get("_from_existing"):
+            # Strip the marker before writing so it doesn't pollute the
+            # output shape. district / state / coords already set.
+            clean_record = {k: v for k, v in d.items() if k != "_from_existing"}
+            out.append(clean_record)
+            continue
+
+        # Fresh raw record — attribute district + classify.
         district = extract_district(d)
         if not district:
             skipped_no_district += 1
@@ -232,7 +304,6 @@ def main() -> int:
         lat, lon = jitter_for(d.get("link", ""), lat0, lon0)
         cls = classify(d.get("title", ""), d.get("summary", ""))
         out.append({
-            "id": i,
             "title": d.get("title", ""),
             "link": d.get("link", ""),
             "published": d.get("published", ""),
@@ -244,16 +315,17 @@ def main() -> int:
             **cls,
         })
 
-    # Sort by published date descending so the file's natural order is
-    # newest-first — some viewers rely on that even though the app re-sorts.
+    # Sort by published date descending — natural newest-first order.
     out.sort(key=lambda r: r.get("published") or "", reverse=True)
     # Re-issue stable IDs after sorting so the id → index mapping is
-    # deterministic across runs.
+    # deterministic across runs. IDs are 0..n-1 in date order, so a new
+    # article at the top pushes everyone's id down by one — that's fine,
+    # nothing on the front-end persists id references across sessions.
     for i, r in enumerate(out):
         r["id"] = i
 
     print(f"Output records: {len(out)}", file=sys.stderr)
-    print(f"Skipped (no district): {skipped_no_district}", file=sys.stderr)
+    print(f"Skipped fresh raws (no district): {skipped_no_district}", file=sys.stderr)
     print(f"Confidence: {Counter(r['confidence'] for r in out)}", file=sys.stderr)
     print(f"State:      {Counter(r['state'] for r in out)}", file=sys.stderr)
 

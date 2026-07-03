@@ -1,17 +1,21 @@
 """
-scrape_gdelt.py — pull historical food-safety news mentions for Telangana +
-Andhra Pradesh from GDELT's DOC 2.0 API.
+scrape_gdelt.py — pull food-safety news mentions for Telangana + Andhra
+Pradesh from GDELT's DOC 2.0 API.
 
-Why GDELT: it's the only free source with a 5-year archive of news mentions
-that ships as structured JSON, no auth, permissive rate limit. Google News
-RSS only exposes the last ~30 days; GDELT indexes everything back to 2015.
+Window size is env-controlled so one script serves both jobs:
 
-Rate limit: docs ask for one request every 5 seconds. We honour that with a
-hard sleep and a jitter so we don't hammer the endpoint if it slows down.
+  · Daily incremental (LOOKBACK_DAYS=2) — the cron default. Runs in about
+    two minutes. Overlap with yesterday's window guarantees no story slips
+    through the seam.
+  · One-time backfill (BACKFILL_YEARS=5) — the seeding run. ~25 min. Kicked
+    off manually via workflow_dispatch after the pipeline is deployed.
 
-The API caps each response at 250 articles and each query at a single
-timespan, so we sweep the 5-year window in month-sized slices per query.
-Slices bigger than a month risk exceeding 250 and silently truncating.
+Rate limit: GDELT's docs ask for one request every 5 seconds. We honour that
+with a hard sleep and a jitter so retries don't push us over.
+
+The API caps each response at 250 articles per query per timespan, so we
+sweep each window in month-sized slices per district. Slices bigger than a
+month risk exceeding 250 and silently truncating.
 
 Output shape (gdelt_raw.json) is deliberately close to the legacy
 news_food_safety_articles__1_.json so clean.py can consume both:
@@ -31,11 +35,16 @@ news_food_safety_articles__1_.json so clean.py can consume both:
 The `matched_query` field is what districts.py-style logic keys off to guess
 the district. GDELT queries here are keyword-only (no location field), so we
 run a separate query per district to preserve that provenance.
+
+The output file is ephemeral — each run overwrites it. Historical records
+survive because clean.py merges gdelt_raw.json with the existing
+public/data.json before writing back, dedup'd on link.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import urllib.parse
@@ -45,9 +54,30 @@ from typing import Iterator
 
 # ---- Config -----------------------------------------------------------------
 
-# 5-year window. Anchored to "now" at run-time in main() so the GH Action
-# picks up the trailing edge automatically each week.
-YEARS_BACK = 5
+# How far back to sweep. Overridable via env so the GitHub Action can do a
+# short 2-day pull on the daily cron and a full 5-year backfill on manual
+# dispatch, without needing two copies of this script.
+#
+# Priority: BACKFILL_YEARS (long sweep) > LOOKBACK_DAYS (short sweep) > 2.
+#
+# Daily default = 2 days: gives GDELT a day of overlap to catch anything
+# that lagged from yesterday's run. Combined with the merge-with-existing
+# step in clean.py, that means no records ever go missing on the trailing
+# edge, and no story appears twice.
+def lookback_delta() -> timedelta:
+    yrs = os.environ.get("BACKFILL_YEARS", "").strip()
+    if yrs:
+        try:
+            return timedelta(days=int(float(yrs) * 365))
+        except ValueError:
+            pass
+    days = os.environ.get("LOOKBACK_DAYS", "").strip()
+    if days:
+        try:
+            return timedelta(days=max(1, int(days)))
+        except ValueError:
+            pass
+    return timedelta(days=2)
 
 # One request per 5 seconds per GDELT's fair-use ask. Actual sleep is a bit
 # more so retries after transient errors don't push us over.
@@ -193,12 +223,15 @@ def sweep_district(district: str, start: datetime, end: datetime) -> list[dict]:
 
 def main() -> int:
     end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    start = end - timedelta(days=365 * YEARS_BACK)
+    delta = lookback_delta()
+    start = end - delta
 
     print(f"Sweeping GDELT for TG + AP food-safety news, "
-          f"{start:%Y-%m-%d} → {end:%Y-%m-%d}", file=sys.stderr)
-    print(f"Districts: {len(DISTRICTS)}, ~5.5s per request → "
-          f"~{len(DISTRICTS) * (YEARS_BACK * 365 // SLICE_DAYS) * 5.5 / 60:.0f} min",
+          f"{start:%Y-%m-%d} → {end:%Y-%m-%d} "
+          f"({delta.days} day window)", file=sys.stderr)
+    est_slices = max(1, delta.days // SLICE_DAYS + (1 if delta.days % SLICE_DAYS else 0))
+    print(f"Districts: {len(DISTRICTS)}, ~{RATE_LIMIT_SECONDS}s per request → "
+          f"~{len(DISTRICTS) * est_slices * RATE_LIMIT_SECONDS / 60:.0f} min",
           file=sys.stderr)
 
     all_articles: list[dict] = []
