@@ -1,0 +1,77 @@
+# Weekly data refresh — pulls fresh food-safety news from GDELT (5-year
+# archive) and Google News RSS (last ~30 days), rebuilds public/data.json,
+# and commits it back to main. Vercel picks up the commit and redeploys
+# automatically, so the live site stays current with zero manual work.
+#
+# Schedule: 04:15 UTC every Monday (~09:45 IST). Off-peak both for GDELT
+# and for whoever's looking at the site.
+#
+# Manual trigger: workflow_dispatch — anyone with write access can hit
+# "Run workflow" in the Actions tab to force an early refresh.
+#
+# GDELT rate limit: the scraper honours ~5.5s between requests. Full sweep
+# is ~25 minutes; keep the job timeout well above that.
+
+name: Refresh data
+
+on:
+  schedule:
+    - cron: '15 4 * * 1'
+  workflow_dispatch:
+
+# Only one refresh at a time. If a scheduled run collides with a manual
+# dispatch, cancel the older one so we don't double-commit.
+concurrency:
+  group: refresh-data
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      # Needs to be able to push the rebuilt public/data.json back to main.
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # persist-credentials so the final `git push` uses GITHUB_TOKEN.
+          persist-credentials: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Scrape GDELT (5-year archive)
+        run: python scrape_gdelt.py
+
+      - name: Scrape Google News RSS (recent top-up)
+        # Non-fatal — if Google throttles us we still have the GDELT sweep.
+        continue-on-error: true
+        run: python scrape_rss.py
+
+      - name: Build public/data.json
+        run: python clean.py
+
+      - name: Commit if data changed
+        # Only commit when the file actually differs. `git diff --quiet`
+        # exits non-zero on changes → we invert that with `!` and only then
+        # add/commit/push. Prevents noisy "no-op" commits when a week has
+        # no new food-safety news.
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          if git diff --quiet -- public/data.json; then
+            echo "No changes to public/data.json — skipping commit."
+            exit 0
+          fi
+          git add public/data.json
+          # Include record count in the message so the commit log is
+          # skimmable at a glance.
+          COUNT=$(python -c "import json;print(len(json.load(open('public/data.json'))))")
+          git commit -m "chore(data): weekly refresh — ${COUNT} records"
+          git push

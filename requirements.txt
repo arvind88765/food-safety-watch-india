@@ -1,0 +1,8 @@
+# Python deps for the data pipeline. Deliberately kept to the standard
+# library where possible — every extra dep is one more thing that can
+# break the weekly refresh. Both scrapers use urllib + xml.etree from
+# stdlib; the only reason this file exists is to pin the ambient Python
+# version and make GitHub Actions caching happy.
+#
+# If we later add feedparser or dateutil for more robust parsing, they
+# go here.

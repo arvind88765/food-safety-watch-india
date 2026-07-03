@@ -29,3 +29,25 @@ Per-restaurant detail — actual name, exact address, specific violations found 
 ## Stack
 
 TypeScript · React · Vite · Python (data cleaning)
+
+---
+
+## Data pipeline
+
+The dataset is rebuilt automatically every Monday morning by a GitHub Action ([`.github/workflows/refresh-data.yml`](.github/workflows/refresh-data.yml)). No manual intervention needed — new records appear on the live site within an hour of the scheduled run.
+
+**Sources merged:**
+- [`scrape_gdelt.py`](scrape_gdelt.py) — pulls the last 5 years of TG + AP food-safety news mentions from [GDELT](https://www.gdeltproject.org/)'s DOC 2.0 API. Free, no auth, structured. Honours their ~5s rate limit.
+- [`scrape_rss.py`](scrape_rss.py) — tops up the last ~30 days from Google News RSS in case GDELT lagged.
+- [`clean.py`](clean.py) — merges both raw feeds (plus any legacy seed file), dedupes on (title, link), extracts district / actions / violations / authority / fine / confidence via regex, and writes `public/data.json`.
+
+**Running it locally:**
+
+```bash
+pip install -r requirements.txt
+python scrape_gdelt.py   # ~25 minutes; writes gdelt_raw.json
+python scrape_rss.py     # ~2 minutes;  writes rss_raw.json
+python clean.py          # writes public/data.json
+```
+
+**Force an early refresh:** Go to the [Actions tab](https://github.com/arvind88765/food-safety-watch-india/actions), pick "Refresh data", click "Run workflow". Anyone with repo write access can do this.
