@@ -37,3 +37,30 @@ Per-restaurant detail — actual name, exact address, specific violations found 
 ## Stack
 
 TypeScript · React · Vite · Python (data cleaning)
+
+---
+
+## Data pipeline
+
+The dataset is rebuilt automatically **every day** by a GitHub Action ([`.github/workflows/refresh-data.yml`](.github/workflows/refresh-data.yml)). No manual intervention needed — new records appear on the live site within an hour of the scheduled 04:15 UTC (09:45 IST) run.
+
+**Daily incremental**: each run only sweeps the last 2 days of news, merges with the historical `public/data.json`, and dedupes on article URL. Old stories are never lost; new stories are appended; the same story never appears twice. A quiet day produces no commit.
+
+**Sources merged:**
+- [`scrape_gdelt.py`](scrape_gdelt.py) — TG + AP food-safety news mentions from [GDELT](https://www.gdeltproject.org/)'s DOC 2.0 API. Free, no auth, structured. Honours their ~5s rate limit. Window size is env-controlled (`LOOKBACK_DAYS=2` for daily, `BACKFILL_YEARS=5` for the one-time seed).
+- [`scrape_rss.py`](scrape_rss.py) — recent Google News RSS as a freshness top-up in case GDELT lagged.
+- [`clean.py`](clean.py) — merges the raw feeds **with the existing `public/data.json`**, dedupes on `link`, attributes district / actions / violations / authority / fine / confidence via regex, sorts by date, and writes back.
+
+**Seeding history (one-time, after merging this PR):**
+Go to the [Actions tab](https://github.com/arvind88765/food-safety-watch-india/actions), pick **"Refresh data"**, click **"Run workflow"**, and enter `5` in the *backfill_years* field. Kicks off a ~25-minute historical sweep, then daily incremental takes over forever.
+
+**Running it locally:**
+
+```bash
+pip install -r requirements.txt
+python scrape_gdelt.py   # 2 days by default; LOOKBACK_DAYS=N or BACKFILL_YEARS=N to override
+python scrape_rss.py
+python clean.py          # merges with existing public/data.json
+```
+
+**Force an early refresh:** Actions → Refresh data → Run workflow (leave *backfill_years* blank).
