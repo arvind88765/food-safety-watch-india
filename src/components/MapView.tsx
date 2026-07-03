@@ -3,7 +3,13 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-le
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import L from 'leaflet'
 import type { Article } from '../lib/types'
-import { ACTION_LABELS, ACTION_COLORS, formatDate, primaryAction } from '../lib/format'
+import { ACTION_LABELS, formatDate, primaryAction, severityFor } from '../lib/format'
+
+interface MapProps {
+  articles: Article[]
+  selectedId?: number | null
+  onSelect: (article: Article) => void
+}
 
 // Leaflet computes its tile grid from the container's size at the moment it
 // mounts. On mobile the map panel starts hidden (display:none) behind the
@@ -25,16 +31,20 @@ function ResizeHandler() {
   return null
 }
 
-function dotIcon(color: string) {
+// Severity-graded dot. Ring intensifies with severity so a red pin also
+// reads as "louder" at cluster-level, not just a different hue.
+function severityDot(color: string, emphasized: boolean) {
+  const size = emphasized ? 18 : 14
+  const ringOpacity = emphasized ? 0.55 : 0.3
   return L.divIcon({
     className: '',
     html: `<span style="
-      display:block;width:14px;height:14px;border-radius:50%;
+      display:block;width:${size}px;height:${size}px;border-radius:50%;
       background:${color};border:2px solid #F4F1E9;
-      box-shadow:0 0 0 1px rgba(0,0,0,0.35);
+      box-shadow:0 0 0 3px ${color}${Math.round(ringOpacity * 255).toString(16).padStart(2, '0')};
     "></span>`,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   })
 }
 
@@ -104,7 +114,34 @@ function LocateControl({
   )
 }
 
-export default function MapView({ articles }: { articles: Article[] }) {
+// Legend explaining the pin colors — otherwise the gradient is meaningless
+// to a new visitor. Compact enough to sit in the corner without occluding.
+function SeverityLegend() {
+  const stops: Array<{ color: string; label: string }> = [
+    { color: '#7A2E22', label: 'Critical' },
+    { color: '#C9532A', label: 'High' },
+    { color: '#E8A33D', label: 'Moderate' },
+    { color: '#8FA34A', label: 'Low' },
+    { color: '#4F6D5C', label: 'Procedural' },
+  ]
+  return (
+    <div className="absolute z-[1000] left-3 bottom-3 bg-ink/85 backdrop-blur border border-paper/15 rounded-md px-3 py-2 shadow-lg">
+      <div className="font-mono text-[0.55rem] uppercase tracking-widest text-paper/45 mb-1.5">
+        Severity
+      </div>
+      <div className="flex flex-col gap-1">
+        {stops.map((s) => (
+          <div key={s.label} className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+            <span className="text-[0.65rem] font-mono text-paper/80">{s.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default function MapView({ articles, selectedId, onSelect }: MapProps) {
   const center: [number, number] = [17.2, 79.8] // roughly between TG/AP centroid
   const [userPos, setUserPos] = useState<{ lat: number; lng: number; accuracy: number } | null>(null)
 
@@ -121,6 +158,7 @@ export default function MapView({ articles }: { articles: Article[] }) {
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
       <LocateControl onLocate={setUserPos} />
+      <SeverityLegend />
       <ResizeHandler />
       {userPos && (
         <>
@@ -138,23 +176,64 @@ export default function MapView({ articles }: { articles: Article[] }) {
       )}
       <MarkerClusterGroup chunkedLoading maxClusterRadius={45}>
         {articles.map((a) => {
+          const severity = severityFor(a)
           const main = primaryAction(a.action_taken)
-          const color = main ? ACTION_COLORS[main] : '#4F6D5C'
+          const emphasized = selectedId === a.id || severity.level === 'critical'
+          // Permanent tooltip content shown on hover — headline preview so
+          // you don't have to click the pin to know if it's worth clicking.
+          const tooltipHtml = `
+            <div style="font-family:'IBM Plex Mono',monospace">
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:${severity.color};margin-bottom:2px">
+                ${severity.label} · ${a.district}
+              </div>
+              <div style="font-family:'Fraunces',Georgia,serif;font-size:0.82rem;line-height:1.25;color:#F4F1E9;max-width:240px">
+                ${escapeHtml(a.title).slice(0, 120)}${a.title.length > 120 ? '…' : ''}
+              </div>
+              <div style="font-size:0.6rem;color:rgba(244,241,233,0.5);margin-top:4px">
+                ${a.source} · ${formatDate(a.published)}
+              </div>
+            </div>
+          `
           return (
-            <Marker key={a.id} position={[a.lat, a.lon]} icon={dotIcon(color)}>
+            <Marker
+              key={a.id}
+              position={[a.lat, a.lon]}
+              icon={severityDot(severity.color, emphasized)}
+              eventHandlers={{
+                click: () => onSelect(a),
+                mouseover: (e) => {
+                  e.target
+                    .bindTooltip(tooltipHtml, {
+                      direction: 'top',
+                      offset: [0, -10],
+                      opacity: 0.98,
+                      className: 'severity-tooltip',
+                    })
+                    .openTooltip()
+                },
+                mouseout: (e) => {
+                  e.target.closeTooltip()
+                  e.target.unbindTooltip()
+                },
+              }}
+            >
+              {/* Fallback popup for touch devices where hover isn't a thing */}
               <Popup maxWidth={280}>
-                <div className="font-mono text-[0.65rem] text-marigold uppercase tracking-wide mb-1">
-                  {a.district}, {a.state === 'Telangana' ? 'TG' : 'AP'} · {formatDate(a.published)}
+                <div className="font-mono text-[0.65rem] uppercase tracking-wide mb-1" style={{ color: severity.color }}>
+                  {severity.label} · {a.district}, {a.state === 'Telangana' ? 'TG' : 'AP'} · {formatDate(a.published)}
                 </div>
                 <div className="font-display text-[0.9rem] leading-snug mb-2">{a.title}</div>
                 {main && (
-                  <div className="text-[0.65rem] font-mono uppercase tracking-wide mb-2" style={{ color }}>
+                  <div className="text-[0.65rem] font-mono uppercase tracking-wide mb-2 text-paper/70">
                     {ACTION_LABELS[main]}
                   </div>
                 )}
-                <a href={a.link} target="_blank" rel="noopener noreferrer" className="text-[0.75rem] underline">
-                  Read source ({a.source}) →
-                </a>
+                <button
+                  onClick={() => onSelect(a)}
+                  className="text-[0.75rem] underline text-marigold cursor-pointer"
+                >
+                  Open full record →
+                </button>
               </Popup>
             </Marker>
           )
@@ -162,4 +241,15 @@ export default function MapView({ articles }: { articles: Article[] }) {
       </MarkerClusterGroup>
     </MapContainer>
   )
+}
+
+// Cheap HTML-escape for values interpolated into the tooltip innerHTML —
+// article titles come straight from RSS feeds so we can't trust them.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }

@@ -20,6 +20,14 @@ Every record links to the original article if you want the full story.
 
 ---
 
+## Severity gradient
+
+Each record is graded from **Procedural** (samples collected, notice issued) up to **Critical** (poisoning incident, or a sealed/closed order with hygiene/pest/adulteration flags in the headline). Map pins are colored on that gradient so the map reads as a risk heatmap at a glance instead of a sea of identical dots. The scoring lives in [`src/lib/format.ts`](src/lib/format.ts) — it's transparent and easy to re-weight.
+
+Severity is derived from the headline text, not from an inspection report. Treat it as an indicator, not a verdict.
+
+---
+
 ## What it doesn't show
 
 Per-restaurant detail — actual name, exact address, specific violations found on inspection — would require fetching and parsing 2,000+ individual articles. That's a separate project. This is the headline layer.

@@ -79,6 +79,20 @@ body {
   color: var(--color-marigold) !important;
 }
 
+/* Hover tooltip for map pins — dark card matching the popup style so
+   hovering feels like a lightweight preview of the click. */
+.severity-tooltip {
+  background: var(--color-ink) !important;
+  border: 1px solid rgba(244, 241, 233, 0.15) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+  padding: 8px 10px !important;
+  color: var(--color-paper) !important;
+}
+.severity-tooltip::before {
+  border-top-color: var(--color-ink) !important;
+}
+
 .scrollbar-thin::-webkit-scrollbar {
   width: 8px;
 }
