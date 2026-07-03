@@ -44,7 +44,7 @@ The pipeline dedupes on the article URL. The same story cannot appear twice, no 
 
 Three scripts, one workflow:
 
-**[`scrape_gdelt.py`](scrape_gdelt.py)** fetches news mentions from GDELT's DOC 2.0 API. It is free, needs no key, and covers years of history. The window is controlled by environment variables. `LOOKBACK_DAYS=2` is the daily default. `BACKFILL_YEARS=5` is the one time historical sweep.
+**[`scrape_gdelt.py`](scrape_gdelt.py)** fetches news mentions from GDELT's DOC 2.0 API. It is free, needs no key, and covers the last few days per run. The window is set by the `LOOKBACK_DAYS` environment variable. Two days is the default, which gives a day of overlap with the previous run so nothing slips through the seam.
 
 **[`scrape_rss.py`](scrape_rss.py)** pulls recent Google News RSS. This exists as a safety net for the days GDELT indexes something a bit late.
 
@@ -58,14 +58,14 @@ If you want to rebuild the dataset on your own machine instead of waiting for th
 
 ```bash
 pip install -r requirements.txt
-python scrape_gdelt.py    # 2 days by default; set LOOKBACK_DAYS or BACKFILL_YEARS to change the window
+python scrape_gdelt.py    # 2 days by default; set LOOKBACK_DAYS=N to change the window
 python scrape_rss.py
 python clean.py           # merges with your existing public/data.json
 ```
 
 ## Forcing an early refresh
 
-Go to the [Actions tab](https://github.com/arvind88765/food-safety-watch-india/actions), click **Refresh data**, click **Run workflow**, then click the green button. Leave the backfill field blank for a normal daily style run. Put `5` in the backfill field if you want a fresh five year seed.
+Go to the [Actions tab](https://github.com/arvind88765/food-safety-watch-india/actions), click **Refresh data**, click **Run workflow**, then click the green button. Takes about 10 minutes.
 
 ## Credits
 

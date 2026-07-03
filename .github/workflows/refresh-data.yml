@@ -1,19 +1,11 @@
-# Daily data refresh — pulls fresh food-safety news for the last ~2 days,
-# merges with the historical public/data.json (dedup'd on link), commits
-# the file back to main if anything changed. Vercel picks up the push and
-# redeploys automatically, so the live site is at most 24 hours stale.
+# Daily data refresh. Every night at 04:15 UTC (09:45 IST) it pulls the last
+# two days of food safety news, merges anything new into public/data.json,
+# commits back to main if the file changed, and Vercel redeploys the site.
+# On quiet nights nothing is committed. Runs take about 10 minutes.
 #
-# Schedule: 04:15 UTC every day (~09:45 IST). Off-peak both for GDELT
-# and for whoever's looking at the site.
-#
-# Manual trigger: workflow_dispatch — anyone with write access can hit
-# "Run workflow" in the Actions tab. Optional inputs:
-#   · backfill_years — if set (e.g. "5"), does a one-time historical
-#     sweep instead of the daily 2-day window. Use once after merging
-#     this PR to seed 5 years of history, then never touch again.
-#
-# Rate limit: GDELT allows one request per 5s. Daily 2-day sweep is
-# ~2 minutes; the 5-year backfill is ~25 min. Job timeout covers both.
+# There is no backfill option. GDELT rate limits made the multi-year seed
+# impractical in a single job. The site grows organically from whatever the
+# daily runs pull in.
 
 name: Refresh data
 
@@ -21,16 +13,9 @@ on:
   schedule:
     - cron: '15 4 * * *'
   workflow_dispatch:
-    inputs:
-      backfill_years:
-        description: 'Backfill years (leave blank for daily 2-day sweep). Use "5" once for initial seed.'
-        required: false
-        default: ''
 
-# Only one refresh at a time. If a new run gets triggered while another is
-# in flight, queue the new one behind the running one instead of killing
-# the running one. Cancelling mid-backfill would waste the ~25 minutes
-# already spent and leave gdelt_raw.json in a half-written state.
+# Only one refresh in flight at a time. A new run queues behind the running
+# one instead of killing it, so nothing gets cancelled mid-scrape.
 concurrency:
   group: refresh-data
   cancel-in-progress: false
@@ -38,7 +23,9 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Daily sweep needs about 10 min; 30 gives plenty of headroom for GDELT
+    # slowness without letting a runaway hog the runner.
+    timeout-minutes: 30
     permissions:
       # Needs to be able to push the rebuilt public/data.json back to main.
       contents: write
@@ -46,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # persist-credentials so the final `git push` uses GITHUB_TOKEN.
+          # persist-credentials so the final git push uses GITHUB_TOKEN.
           persist-credentials: true
 
       - uses: actions/setup-python@v5
@@ -58,14 +45,11 @@ jobs:
 
       - name: Scrape GDELT
         env:
-          # Manual dispatch with backfill_years=5 → 5-year sweep.
-          # Otherwise (scheduled run, or manual with empty input) → 2 days.
-          BACKFILL_YEARS: ${{ github.event.inputs.backfill_years }}
           LOOKBACK_DAYS: '2'
         run: python scrape_gdelt.py
 
       - name: Scrape Google News RSS (recent top-up)
-        # Non-fatal — if Google throttles us we still have the GDELT sweep.
+        # Non-fatal. If Google throttles us we still have the GDELT sweep.
         continue-on-error: true
         run: python scrape_rss.py
 
@@ -73,19 +57,17 @@ jobs:
         run: python clean.py
 
       - name: Commit if data changed
-        # Only commit when the file actually differs. `git diff --quiet`
-        # exits non-zero on changes → invert with `!` and only then
-        # add/commit/push. Prevents noisy "no-op" commits on quiet days.
+        # Only commit when the file actually differs. git diff --quiet exits
+        # non-zero on changes, so we invert with ! and only then push.
+        # Prevents empty "no-op" commits on quiet days.
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           if git diff --quiet -- public/data.json; then
-            echo "No changes to public/data.json — skipping commit."
+            echo "No changes to public/data.json, skipping commit."
             exit 0
           fi
           git add public/data.json
-          # Include record count and delta in the message so the commit
-          # log is skimmable at a glance.
           COUNT=$(python -c "import json;print(len(json.load(open('public/data.json'))))")
-          git commit -m "chore(data): daily refresh — ${COUNT} records"
+          git commit -m "chore(data): daily refresh, ${COUNT} records"
           git push
