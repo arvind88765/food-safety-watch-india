@@ -1,5 +1,10 @@
 # Food Safety Watch, Telangana & Andhra Pradesh
 
+[![GitHub stars](https://img.shields.io/github/stars/arvind88765/food-safety-watch-india?style=social)](https://github.com/arvind88765/food-safety-watch-india/stargazers)
+
+⭐ If this is useful or you just like the idea, a star helps a lot — it's the main way projects like this get discovered.
+
+
 A searchable map and list of food safety enforcement across Telangana and Andhra Pradesh. It reads news headlines about raids, seizures, fines, and food poisoning incidents, then plots them district by district. It started with 2,162 headlines from Google News RSS. It now grows by itself every day.
 
 🔗 **Live site:** [food-safety-watch-india.vercel.app](https://food-safety-watch-india.vercel.app)
